@@ -1,0 +1,6 @@
+{
+  "watch": ["App.js", "Controllers", "Routes", "Models", "Middlewares", "Utils", "Queues", ".env"],
+  "ext": "js,json,env",
+  "ignore": ["node_modules", "uploads", "dist"],
+  "delay": "300ms"
+}

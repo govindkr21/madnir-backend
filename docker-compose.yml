@@ -1,0 +1,27 @@
+# doctor-backend — just this service. Mongo is expected to run elsewhere
+# (host machine, Atlas, or another container); set MONGO_URI in .env.
+# To reach a Mongo running on the host, use:  mongodb://host.docker.internal:27017/doctor
+services:
+
+  backend:
+    image: doctor-backend
+    container_name: doctor-backend
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MODE: ${MODE:-DEVELOPMENT}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - ./:/app
+      - node_modules:/app/node_modules
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+volumes:
+  node_modules:

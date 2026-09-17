@@ -1,0 +1,7 @@
+.git
+node_modules
+uploads
+dist
+*.log
+.env.example
+package-lock.json
