@@ -60,9 +60,7 @@ const DoctorSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
-    // S3 object key for the signature. `signatureUrl` is a short-lived presigned
-    // URL derived from this key at read time — storing the URL alone breaks the
-    // signature image once the presigned token expires.
+    // Cloudinary asset key used to regenerate the signature URL when a doctor is read.
     signatureKey: {
       type: String,
       trim: true,

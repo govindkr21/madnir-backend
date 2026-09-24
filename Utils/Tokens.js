@@ -1,7 +1,11 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
-const SECRET = () => process.env.JWT_SECRET || "dev-secret";
+const SECRET = () => {
+  const secret = String(process.env.JWT_SECRET || "").trim();
+  if (!secret) throw new Error("JWT_SECRET is missing.");
+  return secret;
+};
 
 const newSessionId = () => crypto.randomBytes(16).toString("hex");
 

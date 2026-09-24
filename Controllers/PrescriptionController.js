@@ -4,7 +4,7 @@ const Doctor = require("../Models/DoctorModel");
 const { asyncHandler } = require("../Utils/AsyncHandler");
 const { logAudit } = require("../Utils/Audit");
 const { generateUniqueCode, nextSequence } = require("../Utils/Sequence");
-const { refreshDoctorSignature, signRead } = require("../Utils/S3");
+const { refreshDoctorSignature, signRead } = require("../Utils/Cloudinary");
 
 const actorInfo = (req) => ({
   actorType: req.doctor ? "doctor" : "staff",

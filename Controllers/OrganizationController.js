@@ -7,7 +7,7 @@ const { logAudit } = require("../Utils/Audit");
 const { sendMail } = require("../Utils/Emails/Mailer");
 const { inviteEmail } = require("../Utils/Emails/Templates/Invite");
 const { verifyNmc } = require("../Utils/VerifyNmc");
-const { refreshDoctorSignatures } = require("../Utils/S3");
+const { refreshDoctorSignatures } = require("../Utils/Cloudinary");
 const logger = require("../Utils/Logger");
 
 const getOrgOverview = async (req, res, next) => {
@@ -117,6 +117,9 @@ const inviteDoctor = async (req, res, next) => {
   try {
     const { email, role } = req.body;
     if (!email) return res.status(400).json({ message: "email is required." });
+    if (role === "staff") {
+      return res.status(400).json({ message: "Create staff accounts from Staff Management instead of sending a doctor invite." });
+    }
 
     const maxDoctors = req.organization.maxDoctors;
     const current = await Doctor.countDocuments({ organization: req.doctor.organization, active: true });

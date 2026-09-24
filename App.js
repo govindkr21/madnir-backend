@@ -12,14 +12,21 @@ const { apiLimiter, authLimiter } = require("./Middlewares/RateLimit");
 const env = process.env;
 const PORT = Number(env.PORT) || 8080;
 
+if (env.NODE_ENV === "production" && String(env.JWT_SECRET || "").trim().length < 32) {
+  throw new Error("JWT_SECRET must be set to at least 32 characters in production.");
+}
+
 const app = express();
 app.set("trust proxy", 1);
-
-initMongoDB();
+let server;
 
 const allowList = env.CORS_ORIGIN
   ? env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
+
+if (env.NODE_ENV === "production" && allowList.length === 0) {
+  throw new Error("CORS_ORIGIN must contain at least one allowed origin in production.");
+}
 
 const LAN_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/;
 
@@ -122,17 +129,29 @@ app.use((err, req, res, _next) => {
 process.on("unhandledRejection", (reason) => logger.error("UnhandledRejection:", reason));
 process.on("uncaughtException", (err) => logger.error("UncaughtException:", err));
 
-const server = app.listen(PORT, () => {
-  logger.info("--------------------------------------------");
-  if (env.DEBUG === "OFF") console.log = function () {};
-  logger.info(`DEBUG mode => ${env.DEBUG || "OFF"}`);
-  logger.info(`LOGS type => ${env.LOGS_TYPE || "off"}`);
-  logger.info(`Server listening at port ${PORT}.`);
-  logger.info("--------------------------------------------");
-});
+const startServer = async () => {
+  try {
+    await initMongoDB();
+  } catch (error) {
+    logger.error("MongoDB initialization failed. Server will not start.", error.message);
+    process.exitCode = 1;
+    return;
+  }
+
+  server = app.listen(PORT, () => {
+    logger.info("--------------------------------------------");
+    logger.info(`DEBUG mode => ${env.DEBUG || "OFF"}`);
+    logger.info(`LOGS type => ${env.LOGS_TYPE || "off"}`);
+    logger.info(`Server listening at port ${PORT}.`);
+    logger.info("--------------------------------------------");
+  });
+};
+
+startServer();
 
 const shutdown = (signal) => {
   logger.warn(`${signal} received. Shutting down.`);
+  if (!server) return process.exit(0);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10_000).unref();
 };

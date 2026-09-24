@@ -8,7 +8,8 @@ const { generateUniqueCode, nextSequence } = require("../Utils/Sequence");
 const { completeEntryInternal, sanitizeAttachments } = require("./QueueController");
 const QueueEntry = require("../Models/QueueEntryModel");
 const DoctorDrugPref = require("../Models/DoctorDrugPrefModel");
-const { refreshDoctorSignature, signRead } = require("../Utils/S3");
+const { refreshDoctorSignature, signRead } = require("../Utils/Cloudinary");
+const { sanitizeRichText } = require("../Utils/SanitizeHtml");
 const logger = require("../Utils/Logger");
 
 // Remember each drug's regimen for this doctor so future prescriptions can
@@ -80,8 +81,9 @@ const getConsultation = asyncHandler(async (req, res) => {
     .populate("organization");
   if (!consultation) return res.status(404).json({ message: "Consultation not found." });
   const consultationObj = consultation.toObject();
+  consultationObj.handwrittenBodyHtml = sanitizeRichText(consultationObj.handwrittenBodyHtml);
   consultationObj.doctor = await refreshDoctorSignature(consultationObj.doctor);
-  // Regenerate the handwritten-body image URL from its stored S3 key so
+  // Regenerate the handwritten-body image URL from its stored Cloudinary key so
   // reopening the consultation weeks later still shows the drawing.
   if (consultationObj.handwrittenBodyImageKey) {
     try {
@@ -147,7 +149,7 @@ const createConsultation = asyncHandler(async (req, res) => {
     followUpDate: followUpDate ? new Date(followUpDate) : null,
     status: isStaff ? "scheduled" : status || "completed",
     attachments: finalAttachments,
-    handwrittenBodyHtml: handwrittenBodyHtml || "",
+    handwrittenBodyHtml: sanitizeRichText(handwrittenBodyHtml),
     handwrittenBodyImageKey: handwrittenBodyImageKey || "",
   });
 
@@ -214,6 +216,9 @@ const updateConsultation = asyncHandler(async (req, res) => {
     "handwrittenBodyHtml", "handwrittenBodyImageKey",
   ];
   for (const f of fields) if (req.body[f] !== undefined) consultation[f] = req.body[f];
+  if (req.body.handwrittenBodyHtml !== undefined) {
+    consultation.handwrittenBodyHtml = sanitizeRichText(req.body.handwrittenBodyHtml);
+  }
   if (req.body.attachments !== undefined) {
     consultation.attachments = sanitizeAttachments(req.body.attachments);
   }

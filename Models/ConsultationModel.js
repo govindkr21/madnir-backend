@@ -58,7 +58,7 @@ const ConsultationSchema = new mongoose.Schema(
     // display since complaints/symptoms/medicines are all empty in these
     // modes.
     //   - notepad → `handwrittenBodyHtml` (sanitised HTML, kept in the DB)
-    //   - writing pad → PNG uploaded to S3, referenced by `handwrittenBodyImageKey`;
+    //   - writing pad → PNG uploaded to Cloudinary, referenced by `handwrittenBodyImageKey`;
     //     the URL is regenerated on read (same pattern as the doctor signature)
     handwrittenBodyHtml: { type: String, default: "" },
     handwrittenBodyImageKey: { type: String, default: "" },

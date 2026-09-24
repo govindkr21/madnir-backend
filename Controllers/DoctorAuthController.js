@@ -7,7 +7,7 @@ const { sendMail } = require("../Utils/Emails/Mailer");
 const { otpEmail } = require("../Utils/Emails/Templates/Otp");
 const { resolveSupportContact } = require("../Middlewares/Auth");
 const { verifyNmc } = require("../Utils/VerifyNmc");
-const { refreshDoctorSignature } = require("../Utils/S3");
+const { refreshDoctorSignature } = require("../Utils/Cloudinary");
 const logger = require("../Utils/Logger");
 
 const otpStore = new Map();
@@ -176,6 +176,12 @@ const loginDoctor = async (req, res, next) => {
       return res.status(403).json({ message: "Account is deactivated. Contact your organization owner." });
 
     const organization = doctor.organization ? await Organization.findById(doctor.organization) : null;
+    if (organization?.status === "suspended") {
+      return res.status(403).json({
+        message: "This organization is suspended. Contact the platform administrator.",
+        reason: "organization_suspended",
+      });
+    }
 
     const sid = newSessionId();
     doctor.activeSessionId = sid;
@@ -265,6 +271,7 @@ const resetPassword = async (req, res, next) => {
     }
 
     doctor.password = newPassword;
+    doctor.activeSessionId = newSessionId();
     await doctor.save();
     otpStore.delete(normalized);
 

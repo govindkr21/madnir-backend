@@ -34,12 +34,11 @@ const initMongoDB = async () => {
   const mongoUri = process.env.MONGO_URI;
 
   if (!mongoUri) {
-    console.warn("MONGO_URI is missing. Skipping MongoDB connection.");
-    return;
+    throw new Error("MONGO_URI is missing.");
   }
 
   try {
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10_000 });
     console.info("🟢 Mongo connected successfully.");
     await backfillOrgExpiry();
     const { seedMedicinesIfEmpty } = require("./Medicines/Seeder");
@@ -47,7 +46,7 @@ const initMongoDB = async () => {
     console.info("--------------------------------------------");
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
-    console.warn("Continuing without database connection.");
+    throw error;
   }
 };
 

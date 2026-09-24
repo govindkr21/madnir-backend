@@ -7,6 +7,14 @@ const extractToken = (req) => {
   return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 };
 
+const loadActiveStaff = async (payload) => {
+  const staff = await require("../Models/StaffModel").findOne({
+    _id: payload.id,
+    active: true,
+  }).select("organization doctor name email role active").lean();
+  return staff;
+};
+
 const requireAdminAuth = (req, res, next) => {
   try {
     const token = extractToken(req);
@@ -110,14 +118,16 @@ const requireDoctorAuthAllowPending = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-const requireStaffAuth = (req, res, next) => {
+const requireStaffAuth = async (req, res, next) => {
   try {
     const token = extractToken(req);
     if (!token) return res.status(401).json({ message: "Staff authentication token is required." });
     const payload = verifyToken(token);
     if (payload.role !== "staff")
       return res.status(403).json({ message: "Only staff can perform this action." });
-    req.staff = payload;
+    const staff = await loadActiveStaff(payload);
+    if (!staff) return res.status(401).json({ message: "Staff account is inactive or no longer exists.", reason: "staff_inactive" });
+    req.staff = { ...payload, ...staff, id: staff._id };
     return next();
   } catch {
     return res.status(401).json({ message: "Invalid or expired token." });
@@ -170,7 +180,9 @@ const requireDoctorOrStaffAuth = async (req, res, next) => {
     }
 
     if (payload.role === "staff") {
-      req.staff = payload;
+      const staff = await loadActiveStaff(payload);
+      if (!staff) return res.status(401).json({ message: "Staff account is inactive or no longer exists.", reason: "staff_inactive" });
+      req.staff = { ...payload, ...staff, id: staff._id };
       return next();
     }
 
@@ -193,6 +205,12 @@ const attachOrgContext = async (req, res, next) => {
     if (!orgId) return res.status(400).json({ message: "Organization context missing." });
     const organization = await Organization.findById(orgId);
     if (!organization) return res.status(404).json({ message: "Organization not found." });
+    if (organization.status === "suspended") {
+      return res.status(403).json({
+        message: "This organization is suspended. Contact the platform administrator.",
+        reason: "organization_suspended",
+      });
+    }
     req.organization = organization;
     req.orgId = orgId;
     req.orgExpired = organization.isExpired();
@@ -209,7 +227,7 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const resolveSupportContact = (org) => {
   const sc = org?.supportContact || {};
   return {
-    name: sc.name || process.env.PLATFORM_SUPPORT_NAME || "RxMind Support",
+  name: sc.name || process.env.PLATFORM_SUPPORT_NAME || "Madnir Support",
     email: sc.email || process.env.PLATFORM_SUPPORT_EMAIL || "",
     phone: sc.phone || process.env.PLATFORM_SUPPORT_PHONE || "",
   };

@@ -7,7 +7,7 @@ const escape = (s) =>
     .replace(/'/g, "&#39;");
 
 const brandFromEnv = () => ({
-  name: process.env.BRAND_NAME || "RxMind",
+  name: process.env.BRAND_NAME || "Madnir",
   tagline: process.env.BRAND_TAGLINE || "",
   primaryColor: process.env.BRAND_COLOR_PRIMARY || "#0F766E",
   logoUrl: process.env.BRAND_LOGO_URL || "",

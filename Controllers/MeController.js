@@ -4,7 +4,7 @@ const Admin = require("../Models/AdminModel");
 const Organization = require("../Models/OrganizationModel");
 const { asyncHandler } = require("../Utils/AsyncHandler");
 const { resolveSupportContact } = require("../Middlewares/Auth");
-const { refreshDoctorSignature } = require("../Utils/S3");
+const { refreshDoctorSignature } = require("../Utils/Cloudinary");
 
 const getDoctorMe = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findById(req.doctor.id).select("-password");

@@ -1,5 +1,6 @@
 const QueueEntry = require("../Models/QueueEntryModel");
 const Patient = require("../Models/PatientModel");
+const Doctor = require("../Models/DoctorModel");
 const { asyncHandler } = require("../Utils/AsyncHandler");
 const { logAudit } = require("../Utils/Audit");
 
@@ -37,7 +38,10 @@ const sanitizeAttachments = (arr) => {
   if (!Array.isArray(arr)) return [];
   return arr
     .map((a) => (a && typeof a === "object" ? a : null))
-    .filter((a) => a && typeof a.url === "string" && a.url.startsWith("/uploads/"))
+    .filter((a) => {
+      if (!a || typeof a.url !== "string") return false;
+      return a.url.startsWith("https://res.cloudinary.com/") || a.url.startsWith("/uploads/");
+    })
     .map((a) => ({
       url: a.url,
       name: typeof a.name === "string" ? a.name.slice(0, 200) : "",
@@ -124,6 +128,11 @@ const addToQueue = asyncHandler(async (req, res) => {
   const patient = await Patient.findOne({ _id: patientId, organization: req.orgId });
   if (!patient) return res.status(404).json({ message: "Patient not found in your organization." });
 
+  if (doctorId) {
+    const doctor = await Doctor.findOne({ _id: doctorId, organization: req.orgId, active: { $ne: false } }).select("_id");
+    if (!doctor) return res.status(404).json({ message: "Doctor not found in your organization." });
+  }
+
   const entry = await addToQueueInternal({
     orgId: req.orgId,
     patientId: patient._id,
@@ -146,6 +155,11 @@ const addToQueue = asyncHandler(async (req, res) => {
 const updateEntry = asyncHandler(async (req, res) => {
   const entry = await QueueEntry.findOne({ _id: req.params.entryId, organization: req.orgId });
   if (!entry) return res.status(404).json({ message: "Queue entry not found." });
+
+  if (req.body.doctor !== undefined && req.body.doctor !== null) {
+    const doctor = await Doctor.findOne({ _id: req.body.doctor, organization: req.orgId, active: { $ne: false } }).select("_id");
+    if (!doctor) return res.status(404).json({ message: "Doctor not found in your organization." });
+  }
 
   const fields = ["doctor", "notes", "status"];
   for (const f of fields) if (req.body[f] !== undefined) entry[f] = req.body[f];

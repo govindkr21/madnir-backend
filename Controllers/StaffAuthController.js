@@ -17,6 +17,12 @@ const loginStaff = asyncHandler(async (req, res) => {
   if (!ok) return res.status(401).json({ message: "Invalid credentials." });
 
   const organization = await Organization.findById(staff.organization);
+  if (organization?.status === "suspended") {
+    return res.status(403).json({
+      message: "This organization is suspended. Contact the platform administrator.",
+      reason: "organization_suspended",
+    });
+  }
   const token = signStaffToken(staff);
 
   await logAudit({
