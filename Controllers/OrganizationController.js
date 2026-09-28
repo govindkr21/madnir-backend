@@ -163,9 +163,10 @@ const inviteDoctor = async (req, res, next) => {
       role: invite.role,
       expiresAt: invite.expiresAt,
     });
-    sendMail({ to: invite.email, ...mail }).catch((err) =>
-      logger.warn(`Invite email failed for ${invite.email}: ${err.message}`)
-    );
+    const result = await sendMail({ to: invite.email, ...mail });
+    if (!result.ok) {
+      logger.warn(`Invite email failed for ${invite.email}: ${result.error}`);
+    }
 
     return res.status(201).json({ message: "Invite created.", invite, inviteUrl });
   } catch (e) {
@@ -223,9 +224,10 @@ const resendInvite = async (req, res, next) => {
       role: invite.role,
       expiresAt: invite.expiresAt,
     });
-    sendMail({ to: invite.email, ...mail }).catch((err) =>
-      logger.warn(`Resend invite email failed for ${invite.email}: ${err.message}`)
-    );
+    const result = await sendMail({ to: invite.email, ...mail });
+    if (!result.ok) {
+      logger.warn(`Resend invite email failed for ${invite.email}: ${result.error}`);
+    }
 
     return res.status(200).json({ message: "Invite refreshed.", invite, inviteUrl });
   } catch (e) {

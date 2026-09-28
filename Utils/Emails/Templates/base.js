@@ -11,7 +11,7 @@ const brandFromEnv = () => ({
   tagline: process.env.BRAND_TAGLINE || "",
   primaryColor: process.env.BRAND_COLOR_PRIMARY || "#0F766E",
   logoUrl: process.env.BRAND_LOGO_URL || "",
-  supportEmail: process.env.SUPPORT_EMAIL || process.env.MAIL_REPLY_TO || "harshvaidya345@gmail.com",
+  supportEmail: process.env.SUPPORT_EMAIL || process.env.MAIL_REPLY_TO || "Madnir Support",
   websiteUrl: process.env.FRONTEND_URL || "http://localhost:5173",
 });
 

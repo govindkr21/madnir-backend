@@ -234,9 +234,10 @@ const forgotPassword = async (req, res, next) => {
         actorRole: "doctor",
         ttlMinutes: Math.round(OTP_TTL_MS / 60000),
       });
-      sendMail({ to: doctor.email, ...mail }).catch((err) =>
-        logger.warn(`Forgot-password email failed for doctor ${doctor.email}: ${err.message}`)
-      );
+      const result = await sendMail({ to: doctor.email, ...mail });
+      if (!result.ok) {
+        logger.warn(`Forgot-password email failed for doctor ${doctor.email}: ${result.error}`);
+      }
     }
     return res.status(200).json({
       message: "If the email is registered, an OTP has been sent.",

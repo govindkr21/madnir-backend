@@ -3,6 +3,7 @@ const Patient = require("../Models/PatientModel");
 const Doctor = require("../Models/DoctorModel");
 const { asyncHandler } = require("../Utils/AsyncHandler");
 const { logAudit } = require("../Utils/Audit");
+const { createNotification } = require("./NotificationController");
 
 const actorInfo = (req) => ({
   actorType: req.doctor ? "doctor" : "staff",
@@ -149,6 +150,21 @@ const addToQueue = asyncHandler(async (req, res) => {
     .populate("doctor", "name specialization")
     .lean();
 
+  // Fire-and-forget notification — never blocks the response
+  setImmediate(() => {
+    createNotification({
+      organizationId: req.orgId,
+      type: "queue_new",
+      title: `New patient in queue: ${patient.name}`,
+      body: `${patient.name} has been added to today's queue.`,
+      meta: {
+        patientId: patient._id,
+        queueEntryId: entry._id,
+        patientName: patient.name,
+      },
+    }).catch(() => {});
+  });
+
   res.status(201).json({ message: "Added to queue.", entry: populated });
 });
 
@@ -170,7 +186,24 @@ const updateEntry = asyncHandler(async (req, res) => {
   if (req.body.attachments !== undefined) {
     entry.attachments = sanitizeAttachments(req.body.attachments);
   }
+  const wasStarted = req.body.status === "in_progress" && entry.status === "in_progress";
   await entry.save();
+
+  // Fire notification when a consultation is started (status → in_progress)
+  if (wasStarted) {
+    const pop = await QueueEntry.findById(entry._id).populate("patient", "name").lean();
+    const pName = pop?.patient?.name || "Patient";
+    setImmediate(() => {
+      createNotification({
+        organizationId: req.orgId,
+        type: "queue_started",
+        title: `Consultation started: ${pName}`,
+        body: `The consultation with ${pName} is now in progress.`,
+        meta: { queueEntryId: entry._id, patientName: pName },
+      }).catch(() => {});
+    });
+  }
+
   res.status(200).json({ message: "Queue entry updated.", entry });
 });
 

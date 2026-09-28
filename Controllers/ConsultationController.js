@@ -11,6 +11,7 @@ const DoctorDrugPref = require("../Models/DoctorDrugPrefModel");
 const { refreshDoctorSignature, signRead } = require("../Utils/Cloudinary");
 const { sanitizeRichText } = require("../Utils/SanitizeHtml");
 const logger = require("../Utils/Logger");
+const { createNotification } = require("./NotificationController");
 
 // Remember each drug's regimen for this doctor so future prescriptions can
 // auto-fill it. Best-effort — never blocks or fails the consultation save.
@@ -202,6 +203,39 @@ const createConsultation = asyncHandler(async (req, res) => {
       consultationId: consultation._id,
     });
   }
+
+  // Fire-and-forget notifications — never block the response
+  setImmediate(() => {
+    // 1. Consultation saved
+    createNotification({
+      organizationId: req.orgId,
+      type: "consultation_saved",
+      title: `Consultation recorded: ${patient.name}`,
+      body: diagnosis
+        ? `Diagnosis: ${diagnosis}`
+        : `Visit recorded for ${patient.name}.`,
+      meta: {
+        patientId: patient._id,
+        consultationId: consultation._id,
+        patientName: patient.name,
+      },
+    }).catch(() => {});
+
+    // 2. Prescription ready (if one was created)
+    if (prescription) {
+      createNotification({
+        organizationId: req.orgId,
+        type: "prescription_ready",
+        title: `Prescription ready: ${patient.name}`,
+        body: `Rx #${prescription.rxNumber} — ${medicines.length} medicine${medicines.length === 1 ? "" : "s"} prescribed.`,
+        meta: {
+          patientId: patient._id,
+          consultationId: consultation._id,
+          patientName: patient.name,
+        },
+      }).catch(() => {});
+    }
+  });
 
   res.status(201).json({ message: "Consultation saved.", consultation, prescription });
 });

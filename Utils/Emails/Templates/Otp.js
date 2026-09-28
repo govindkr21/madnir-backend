@@ -1,4 +1,5 @@
 const { render, textRow, otpRow, brandFromEnv, escape } = require("./base");
+const crypto = require("crypto");
 
 /**
  * Otp email — used by forgot-password flows.
@@ -58,7 +59,7 @@ const otpEmail = ({
     subject,
     html,
     text,
-    idempotencyKey: `otp-${actorRole}/${otp}`,
+    idempotencyKey: `otp-${actorRole}/${crypto.createHash("sha256").update(String(otp)).digest("hex")}`,
     tags: [
       { name: "category", value: "otp" },
       { name: "actor_role", value: String(actorRole) },

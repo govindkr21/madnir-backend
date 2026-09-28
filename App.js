@@ -6,6 +6,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const { initMongoDB } = require("./Utils/Config");
+const { validateProductionEmailConfig } = require("./Utils/Emails/Mailer");
 const logger = require("./Utils/Logger");
 const { apiLimiter, authLimiter } = require("./Middlewares/RateLimit");
 
@@ -27,6 +28,8 @@ const allowList = env.CORS_ORIGIN
 if (env.NODE_ENV === "production" && allowList.length === 0) {
   throw new Error("CORS_ORIGIN must contain at least one allowed origin in production.");
 }
+
+validateProductionEmailConfig();
 
 const LAN_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/;
 
@@ -104,6 +107,7 @@ app.use("/api/medicines", require("./Routes/MedicineRoute"));
 app.use("/api/templates", require("./Routes/TemplateRoute"));
 app.use("/api/uploads", require("./Routes/UploadRoute"));
 app.use("/api/dashboard", require("./Routes/DashboardRoute"));
+app.use("/api/notifications", require("./Routes/NotificationRoute"));
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found.", path: req.originalUrl });
