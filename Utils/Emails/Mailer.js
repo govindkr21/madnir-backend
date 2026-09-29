@@ -1,7 +1,7 @@
 const logger = require("../Logger");
 
 const IS_PRODUCTION = () => process.env.NODE_ENV === "production";
-const FROM_DEFAULT = () => process.env.MAIL_FROM || "Madnir <noreply@fialetech.com>";
+const FROM_DEFAULT = () => process.env.MAIL_FROM || "Madnir <noreply@madnir.com>";
 const REPLY_TO = () => process.env.MAIL_REPLY_TO || "";
 const API_KEY = () => process.env.RESEND_API_KEY || "";
 const DEV_OVERRIDE = () => (process.env.DEV_MAIL_OVERRIDE || "").trim();

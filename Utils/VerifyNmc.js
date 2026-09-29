@@ -1,8 +1,8 @@
 const https = require("https");
 const logger = require("./Logger");
 
-const NMC_HOST = "www.nmc.org.in";
-const NMC_PATH = "/MCIRest/api/imr/search";
+const NMC_HOST = "nmc.org.in";
+const NMC_PATH = "/indian-medical-register/search";
 const REQUEST_TIMEOUT_MS = 15000;
 const DESKTOP_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -10,59 +10,58 @@ const DESKTOP_UA =
   "Chrome/124.0.0.0 Safari/537.36";
 
 // Maps the canonical council names used in frontend/src/constants/medicalCouncils.js
-// to the smcId values accepted by the NMC IMR search endpoint.
-// IDs can be overridden via NMC_SMC_ID_OVERRIDES env var (JSON: { "Council Name": 7 }).
-const DEFAULT_SMC_ID_MAP = {
-  "Andhra Pradesh Medical Council": 1,
-  "Arunachal Pradesh Medical Council": 2,
-  "Assam Medical Council": 3,
-  "Bihar Medical Council": 4,
-  "Bombay Medical Council": 5,
-  "Chhattisgarh Medical Council": 6,
-  "Delhi Medical Council": 7,
-  "Goa Medical Council": 8,
-  "Gujarat Medical Council": 9,
-  "Haryana Medical Council": 10,
-  "Himachal Pradesh Medical Council": 11,
-  "Jammu & Kashmir Medical Council": 12,
-  "Jharkhand Medical Council": 13,
-  "Karnataka Medical Council": 14,
-  "Madhya Pradesh Medical Council": 15,
-  "Maharashtra Medical Council": 16,
-  "Manipur Medical Council": 17,
-  "Mizoram Medical Council": 19,
-  "Nagaland Medical Council": 20,
-  "Odisha Council of Medical Registration": 21,
-  "Punjab Medical Council": 22,
-  "Rajasthan Medical Council": 23,
-  "Sikkim Medical Council": 24,
-  "Tamil Nadu Medical Council": 25,
-  "Telangana State Medical Council": 26,
-  "Travancore-Cochin Medical Council (Kerala)": 27,
-  "Tripura State Medical Council": 28,
-  "Uttar Pradesh Medical Council": 29,
-  "Uttarakhand Medical Council": 30,
-  "West Bengal Medical Council": 31,
-  "Meghalaya Medical Council": 32,
-  "National Medical Commission (NMC)": 33,
+// to the state codes accepted by the NMC IMR search endpoint (see
+// https://nmc.org.in/indian-medical-register/states). Councils without a code
+// (Bombay, Meghalaya, NMC) are searched by registration number alone.
+// Codes can be overridden via NMC_SMC_ID_OVERRIDES env var (JSON: { "Council Name": "DEL" }).
+const DEFAULT_STATE_CODE_MAP = {
+  "Andhra Pradesh Medical Council": "AND",
+  "Arunachal Pradesh Medical Council": "ARU",
+  "Assam Medical Council": "ASS",
+  "Bihar Medical Council": "BIH",
+  "Chhattisgarh Medical Council": "CHA",
+  "Delhi Medical Council": "DEL",
+  "Goa Medical Council": "GOA",
+  "Gujarat Medical Council": "GUJ",
+  "Haryana Medical Council": "HAR",
+  "Himachal Pradesh Medical Council": "HIM",
+  "Jammu & Kashmir Medical Council": "JAM",
+  "Jharkhand Medical Council": "JHA",
+  "Karnataka Medical Council": "KAR",
+  "Madhya Pradesh Medical Council": "MAD",
+  "Maharashtra Medical Council": "MAH",
+  "Manipur Medical Council": "MAN",
+  "Mizoram Medical Council": "MIZ",
+  "Nagaland Medical Council": "NAG",
+  "Odisha Council of Medical Registration": "ORI",
+  "Punjab Medical Council": "PUN",
+  "Rajasthan Medical Council": "RAJ",
+  "Sikkim Medical Council": "SIK",
+  "Tamil Nadu Medical Council": "TAM",
+  "Telangana State Medical Council": "TEL",
+  "Travancore-Cochin Medical Council (Kerala)": "TC",
+  "Tripura State Medical Council": "TRI",
+  "Uttar Pradesh Medical Council": "UP",
+  "Uttarakhand Medical Council": "UTT",
+  "West Bengal Medical Council": "WES",
 };
 
-let smcIdMap = null;
-const getSmcIdMap = () => {
-  if (smcIdMap) return smcIdMap;
-  smcIdMap = { ...DEFAULT_SMC_ID_MAP };
+let stateCodeMap = null;
+const getStateCodeMap = () => {
+  if (stateCodeMap) return stateCodeMap;
+  stateCodeMap = { ...DEFAULT_STATE_CODE_MAP };
   if (process.env.NMC_SMC_ID_OVERRIDES) {
     try {
-      Object.assign(smcIdMap, JSON.parse(process.env.NMC_SMC_ID_OVERRIDES));
+      Object.assign(stateCodeMap, JSON.parse(process.env.NMC_SMC_ID_OVERRIDES));
     } catch (e) {
       logger.warn(`NMC_SMC_ID_OVERRIDES parse failed: ${e.message}`);
     }
   }
-  return smcIdMap;
+  return stateCodeMap;
 };
 
-const resolveSmcId = (councilName) => {
-  const map = getSmcIdMap();
+const resolveStateCode = (councilName) => {
+  const map = getStateCodeMap();
   const exact = map[councilName];
   if (exact) return exact;
   const norm = String(councilName || "").trim().toLowerCase();
@@ -72,39 +71,19 @@ const resolveSmcId = (councilName) => {
   return null;
 };
 
-const extractFirstRecord = (payload) => {
-  if (!payload || typeof payload !== "object") return null;
-  const candidates = [
-    payload.data,
-    payload.result,
-    payload.results,
-    payload.records,
-    payload.content,
-    payload.data && payload.data.records,
-    payload.data && payload.data.content,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c) && c.length > 0) return c[0];
-  }
-  if (Array.isArray(payload) && payload.length > 0) return payload[0];
-  return null;
-};
+const normReg = (s) => String(s || "").replace(/\s+/g, "").toUpperCase();
 
-const postJson = (body) =>
+const getJson = (query) =>
   new Promise((resolve, reject) => {
-    const data = JSON.stringify(body);
     const req = https.request(
       {
         host: NMC_HOST,
-        path: NMC_PATH,
-        method: "POST",
+        path: `${NMC_PATH}?${new URLSearchParams(query).toString()}`,
+        method: "GET",
         timeout: REQUEST_TIMEOUT_MS,
         headers: {
-          "Content-Type": "application/json",
           Accept: "application/json, text/plain, */*",
-          "Content-Length": Buffer.byteLength(data),
           "User-Agent": DESKTOP_UA,
-          Origin: `https://${NMC_HOST}`,
           Referer: `https://${NMC_HOST}/information-desk/indian-medical-register/`,
         },
         rejectUnauthorized: process.env.NMC_INSECURE_TLS !== "1",
@@ -126,7 +105,6 @@ const postJson = (body) =>
       req.destroy(new Error("NMC request timed out"));
     });
     req.on("error", reject);
-    req.write(data);
     req.end();
   });
 
@@ -136,37 +114,36 @@ const postJson = (body) =>
  *   { verified: true,  data, reachable: true }
  *   { verified: false, found: false, reachable: true,  message }   -> registration not found
  *   { verified: false, reachable: false, message }                  -> NMC unreachable / soft failure
- *   { verified: false, reachable: true,  message, badInput: true } -> council unmapped or missing inputs
+ *   { verified: false, reachable: true,  message, badInput: true } -> missing inputs
  */
 async function verifyNmc({ nmc, medicalCouncil }) {
   const registrationNo = String(nmc || "").trim();
   if (!registrationNo) {
     return { verified: false, reachable: true, badInput: true, message: "NMC / Registration number is required." };
   }
-  const smcId = resolveSmcId(medicalCouncil);
-  if (!smcId) {
-    return {
-      verified: false,
-      reachable: true,
-      badInput: true,
-      message: `State Medical Council "${medicalCouncil}" is not mapped to an NMC smcId.`,
-    };
-  }
+  const stateCode = resolveStateCode(medicalCouncil);
 
   try {
-    const { status, body } = await postJson({
-      registrationNo,
-      smcId: String(smcId),
-      pageNo: 0,
-      pageSize: 10,
-    });
+    const query = { search_type: "reg_no", reg_no: registrationNo, page: 1, per_page: 100 };
+    const { status, body } = await getJson(query);
     if (status >= 500 || status === 0) {
       return { verified: false, reachable: false, message: `NMC responded with HTTP ${status}` };
     }
-    if (status >= 400) {
-      return { verified: false, reachable: true, message: `NMC responded with HTTP ${status}` };
+    if (status >= 300) {
+      // 3xx/4xx (e.g. a moved endpoint): can't judge the doctor, so treat NMC as unreachable
+      // and leave the account for manual admin review instead of wrongly rejecting it.
+      logger.warn(`NMC verification: unexpected HTTP ${status}`);
+      return { verified: false, reachable: false, message: `NMC responded with HTTP ${status}` };
     }
-    const rec = extractFirstRecord(body);
+    if (!body || typeof body !== "object" || !Array.isArray(body.data)) {
+      logger.warn("NMC verification: unexpected response shape");
+      return { verified: false, reachable: false, message: "Unexpected response from NMC" };
+    }
+
+    const wanted = normReg(registrationNo);
+    const rec = body.data.find(
+      (r) => normReg(r.registration_no) === wanted && (!stateCode || r.state_code === stateCode)
+    );
     if (!rec) {
       return {
         verified: false,
@@ -175,20 +152,19 @@ async function verifyNmc({ nmc, medicalCouncil }) {
         message: "No matching doctor found in the Indian Medical Register.",
       };
     }
-    const doctorName =
-      rec.doctorName || rec.fullName || rec.name || rec.firstName || null;
-    const registrationNumber =
-      rec.registrationNo || rec.registrationNumber || rec.regNo || registrationNo;
+
+    const extra = Array.isArray(rec.additional_qualifications) ? rec.additional_qualifications : [];
+    const qualification = [rec.qualification, ...extra.map((q) => q.qualification)].filter(Boolean).join(", ") || null;
     return {
       verified: true,
       reachable: true,
       data: {
-        doctorName,
-        registrationNumber,
-        stateMedicalCouncil: rec.smcName || rec.stateMedicalCouncil || rec.councilName || medicalCouncil,
-        qualification: rec.qualification || rec.qualificationName || rec.qualifications || null,
-        university: rec.university || rec.universityName || rec.institute || null,
-        yearOfRegistration: rec.yearOfRegistration || rec.year || rec.registrationYear || null,
+        doctorName: rec.name || null,
+        registrationNumber: rec.registration_no || registrationNo,
+        stateMedicalCouncil: rec.state_medical_council || medicalCouncil,
+        qualification,
+        university: rec.university || null,
+        yearOfRegistration: rec.year_of_info || null,
         raw: rec,
       },
     };
@@ -198,4 +174,4 @@ async function verifyNmc({ nmc, medicalCouncil }) {
   }
 }
 
-module.exports = { verifyNmc, resolveSmcId };
+module.exports = { verifyNmc, resolveStateCode };
