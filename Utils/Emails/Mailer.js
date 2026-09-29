@@ -37,7 +37,7 @@ const validateProductionEmailConfig = () => {
   if (!String(process.env.SUPPORT_EMAIL || "").trim()) missing.push("SUPPORT_EMAIL");
 
   if (missing.length > 0) {
-    throw new Error(`Production email configuration is missing: ${missing.join(", ")}`);
+    logger.warn(`Production email configuration is missing: ${missing.join(", ")}. Email sending will not work until this is set.`);
   }
 };
 
